@@ -30,9 +30,10 @@ fn main() {
     
     // Using a bitmask with 64 bits. Each iteration we AND them to get the one item they all have in common
     let mut items: [u64; 3] = [0; 3];
-    let mut sum = 0;
+    let mut sum: u32 = 0;
     for (index, line) in read_lines("./res/day3.txt").expect("Couldn't read file!").enumerate() {
-        line.chars().map(char_to_value).for_each(|value| items[index % 3] |= 1 << value);
+        let item = &mut items[index % 3];
+        line.chars().map(char_to_value).for_each(|value| *item |= 1 << value);
 
         if index % 3 == 2 {
             sum += items.iter().fold(u64::MAX, |acc, bits| acc & bits).trailing_zeros();
