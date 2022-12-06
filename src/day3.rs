@@ -1,74 +1,44 @@
 use aoc22::read_lines;
 
-fn char_to_index(c: char) -> (char, usize) {
+fn char_to_value(c: char) -> u32 {
     if c.is_ascii_lowercase() {
-        return (c, c as usize - ('a' as usize));
+        return c as u32 - ('a' as u32) + 1;
     }
     if c.is_ascii_uppercase() {
-        return (c, c as usize - ('A' as usize) + 26);
+        return c as u32 - ('A' as u32) + 27;
     }
 
     panic!("Found non-alphabetic character in string!");
 }
 
-#[inline]
-fn index_to_value(u: usize) -> u32 {
-    u as u32 + 1
-}
-
 fn main() {
-    // Holds a boolean for each item we may encounter
-    let mut items: [bool; 52] = [false; 52];
     let mut sum: u32 = 0;
-
     for line in read_lines("./res/day3.txt").expect("Couldn't read file!") {
         let length = line.chars().count();
 
-        for (_, item) in line.chars().take(length/2).map(char_to_index) {
-            items[item] = true;
-        }
+        // Constructing a bitmask where each set bit represents an item.
+        let comp1 = line.chars().take(length/2).map(char_to_value).fold(0u64, |acc, value| acc | (1 << value));
+        let comp2 = line.chars().skip(length/2).map(char_to_value).fold(0u64, |acc, value| acc | (1 << value));
 
-        for (_, item) in line.chars().skip(length/2).map(char_to_index) {
-            if items[item] { // This item has already been found in the other compartment
-                sum += index_to_value(item);
-                break;
-            }
-        }
-
-        items = [false; 52];
+        // Using AND, we get the item both compartments share
+        sum += (comp1 & comp2).trailing_zeros();
     }
 
     println!("The sum of all incorrect items is {}", sum);
 
     // ################################## Part 2 #########################################
     
-    let mut items: [u8; 52] = [0; 52];
-    let mut sum: u32 = 0;
-    'outer: for (index, line) in read_lines("./res/day3.txt").expect("Couldn't read file!").enumerate() {
-        let iter = line.chars().map(char_to_index);
-        match index % 3 {
-            0 => iter.for_each(|(_, item)| items[item] = 1),
-            1 => {
-                for (_, item) in iter {
-                    if items[item] == 1 {
-                        items[item] = 2;
-                    }
-                };
-            },
-            2 => {
-                for (_, item) in iter {
-                    // Found the badge
-                    if items[item] == 2 {
-                        sum += index_to_value(item);
-                        // Reset array and continue outer loop
-                        items = [0; 52];
-                        continue 'outer;
-                    }
-                };
-            },
-            _ => unreachable!()
-        };
-    }
+    // Using a bitmask with 64 bits. Each iteration we AND them to get the one item they all have in common
+    let mut items: [u64; 3] = [0; 3];
+    let mut sum = 0;
+    for (index, line) in read_lines("./res/day3.txt").expect("Couldn't read file!").enumerate() {
+        line.chars().map(char_to_value).for_each(|value| items[index % 3] |= 1 << value);
 
+        if index % 3 == 2 {
+            sum += items.iter().fold(u64::MAX, |acc, bits| acc & bits).trailing_zeros();
+            items = [0; 3];
+        }
+    }
     println!("The sum of all badges is {}", sum);
+    
 }
