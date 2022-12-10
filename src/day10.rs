@@ -14,8 +14,10 @@ fn main() {
     let mut cycle: i32 = 1;
     let mut register: i32 = 1;
     let mut sum: i32 = 0;
-    // part2
+
+    // Part 2
     let mut crt = [false; 240];
+
 
     for instruction in instructions {
         tick_cycle(&cycle, &register, &mut sum, &mut crt);
@@ -33,12 +35,10 @@ fn main() {
         };
     }
     println!("The sum of the six signal strengths is {}", sum);
+
     // Part 2
     for chunk in crt.chunks(40) {
-        let mut line = String::new();
-        for &vis in chunk {
-            line.push(if vis {'#'} else {'.'});
-        }
+        let line: String = chunk.iter().map(|&vis| if vis {'#'} else {'.'}).collect();
         println!("{}", line)
     }
 }
