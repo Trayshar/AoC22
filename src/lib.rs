@@ -26,6 +26,24 @@ pub fn contains_duplicates<T: PartialEq>(slice: &[T]) -> bool {
     (1..slice.len()).any(|i| slice[i..].contains(&slice[i - 1]))
 }
 
+/// Returns three mutable borrows from a slice.
+/// Panics if the indices are not sorted in ascending order or are not disjoint 
+pub fn split_mut_three<'a, I>(arr: &'a mut [I], indices: (usize, usize, usize)) -> (&'a mut I, &'a mut I, &'a mut I) {
+    assert!(indices.0 < indices.1);
+    assert!(indices.1 < indices.2);
+
+    let (l, r) = arr.split_at_mut(indices.2);
+    let mut_two = &mut r[0];
+
+    let (l, r) = l.split_at_mut(indices.1);
+    let mut_one = &mut r[0];
+
+    let (_l, r) = l.split_at_mut(indices.0);
+    let mut_zero = &mut r[0];
+
+    (mut_zero, mut_one, mut_two)
+}
+
 #[derive(Debug)]
 pub struct TreeNode<T> {
     // Internal field holding all the data. Rc counts references, RefCell lets us mutate the data
