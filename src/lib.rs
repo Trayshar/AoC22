@@ -113,3 +113,21 @@ impl <T> TreeNode<T> {
         current_dir
     }
 }
+
+pub fn dijkstra<'a, AF, CF, C>(node_count: usize, start: usize, adjacents: AF, costs: CF) 
+where C: Sized + Clone + From<u8>,
+AF: Fn(usize) -> &'a [usize],
+CF: Fn(usize,usize) -> Option<C> {
+    assert!(start < node_count, "Start node index larger than node count!");
+    let mut costs: Vec<Option<C>> = vec![None; node_count];
+
+    let mut visited: Vec<usize> = Vec::new();
+    let mut node = start;
+    while visited.len() < node_count {
+        visited.push(node);
+        let adjs = adjacents(node);
+        for adj in adjs.iter() {
+            
+        }
+    }
+}
