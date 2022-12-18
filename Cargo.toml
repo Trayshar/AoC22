@@ -47,12 +47,18 @@ path = "src/day10.rs"
 name = "day11"
 path = "src/day11.rs"
 
-[[bin]]
-name = "day12"
-path = "src/day12.rs"
+# Unfinished
+# [[bin]]
+# name = "day12"
+# path = "src/day12.rs"
+
+# Unfinished
+# [[bin]]
+# name = "day16"
+# path = "src/day16.rs"
 
 [[bin]]
-name = "day16"
-path = "src/day16.rs"
+name = "day18"
+path = "src/day18.rs"
 
 [dependencies]
