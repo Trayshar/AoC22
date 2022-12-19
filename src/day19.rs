@@ -35,7 +35,7 @@ fn main() {
 
     println!("{:?}", blueprints);
 
-    let scores: Vec<_> = blueprints.iter().take(1).map(|bp| (bp.id, play_game(bp, 24))).collect();
+    let scores: Vec<_> = blueprints.iter().skip(1).map(|bp| (bp.id, play_game(bp, 24))).collect();
     println!("{:?}", scores);
 }
 
@@ -105,18 +105,23 @@ macro_rules! impl_build_roboter {
         }
     };
 }
-
 impl_build_roboter!(build_ore_roboter, ore, ore);
 impl_build_roboter!(build_clay_roboter, clay, ore);
 impl_build_roboter!(build_obsidian_roboter, obsidian, ore, clay);
 impl_build_roboter!(build_geode_roboter, geodes, ore, obsidian);
 
-macro_rules! calc_ratio {
-    ( $cost:expr, $res:expr, $robos:expr, $res_a:ident, $res_b:ident ) => {
-        (
-            if $robos.$res_a != 0 { ($cost.$res_a as f32 - $res.$res_a as f32) / $robos.$res_a as f32 } else { f32::MAX }, 
-            if $robos.$res_b != 0 { ($cost.$res_b as f32 - $res.$res_b as f32) / $robos.$res_b as f32 } else { f32::MAX }
-        )
+macro_rules! calc_remaining_time {
+    ( $cost:expr, $res:expr, $robos:expr, res=[$res_a:ident, $res_b:ident] $(, build=[$build_robo_costs:expr, $build_robo:ident])? ) => {
+        {
+            let robots_a = $robos.$res_a $(+ if stringify!($build_robo) == stringify!($res_a) {1} else {0})?;
+            let robots_b = $robos.$res_b $(+ if stringify!($build_robo) == stringify!($res_b) {1} else {0})?;
+
+            let time_a: f32 = if robots_a != 0 { ($cost.$res_a as f32 - $res.$res_a as f32 $(+ $build_robo_costs.$res_a as f32)? ) / robots_a as f32 } else { f32::MAX };
+            let time_b: f32 = if robots_b != 0 { ($cost.$res_b as f32 - $res.$res_b as f32 $(+ $build_robo_costs.$res_b as f32)? ) / robots_b as f32 } else { f32::MAX };
+            let time: u8 = f32::max(time_a, time_b).clamp(0.0, 255.0) as u8;
+            (time_a, time_b, time)
+        }
+
     };
 }
 
@@ -131,23 +136,58 @@ fn play_game(bp: &Blueprint, minutes: u8) -> u8 {
         // Try to build an geode roboter
         if !build_geode_roboter(&bp.geode_robot, &mut res, &mut queue) {
             // Can't build a geode roboter. Checking which resource is bottleneck
-            let (ore_ratio, obsidian_ratio): (f32, f32) = calc_ratio!(bp.geode_robot, res, robo, ore, obsidian);
-
-            if ore_ratio > obsidian_ratio && (robo.ore + 1) * (minutes - minute) + res.ore >= bp.geode_robot.ore {
+            let (ore_ratio, obsidian_ratio, geode_time): (f32, f32, u8) = calc_remaining_time!(bp.geode_robot, res, robo, res=[ore, obsidian]);
+            
+            if ore_ratio > obsidian_ratio {
                 // Try to build an ore roboter
-                build_ore_roboter(&bp.ore_robot, &mut res, &mut queue);
-            } else if (robo.obsidian + 1) * (minutes - minute) + res.obsidian >= bp.geode_robot.obsidian {
-                // Try to build an obsidian roboter
-                if !build_obsidian_roboter(&bp.obsidian_robot, &mut res, &mut queue) {
-                    // Can't build an obsidian roboter. Checking which resource is bottleneck
-                    let (ore_ratio, clay_ratio): (f32, f32) = calc_ratio!(bp.obsidian_robot, res, robo, ore, clay);
+                let (_, _, new_time) = calc_remaining_time!(bp.geode_robot, res, robo, res=[ore, obsidian], build=[bp.ore_robot, ore]);
 
-                    if ore_ratio > clay_ratio && (robo.ore + 1) * (minutes - minute) + res.ore >= bp.obsidian_robot.ore && (robo.ore + 1) * (minutes - minute) + res.ore >= bp.geode_robot.ore {
-                        // Try to build an ore roboter
-                        build_ore_roboter(&bp.ore_robot, &mut res, &mut queue);
-                    } else if (robo.clay + 1) * (minutes - minute) + res.clay >= bp.obsidian_robot.clay {
-                        // Try to build an clay roboter
-                        build_clay_roboter(&bp.clay_robot, &mut res, &mut queue);
+                println!("M{} [G] Ore roboter: {} vs {}", minute, new_time, geode_time);
+                if new_time <= geode_time {
+                    build_ore_roboter(&bp.ore_robot, &mut res, &mut queue);
+                }
+            } else {
+                // Try to build an obsidian roboter
+                let (_, _, new_time) = calc_remaining_time!(bp.geode_robot, res, robo, res=[ore, obsidian], build=[bp.obsidian_robot, obsidian]);
+
+                println!("M{} [G] Obsidian roboter: {} vs {}", minute, new_time, geode_time);
+                if new_time <= geode_time  {
+                    if !build_obsidian_roboter(&bp.obsidian_robot, &mut res, &mut queue) {
+                        // Can't build an obsidian roboter. Checking which resource is bottleneck
+                        let (ore_ratio, clay_ratio, obsidian_time): (f32, f32, u8) = calc_remaining_time!(bp.obsidian_robot, res, robo, res=[ore, clay]);
+    
+                        if ore_ratio > clay_ratio {
+                            // Try to build an ore roboter
+                            let (_, _, new_time_geode) = calc_remaining_time!(bp.geode_robot, res, robo, res=[ore, obsidian], build=[bp.ore_robot, ore]);
+                            let (_, _, new_time_obsidian) = calc_remaining_time!(bp.obsidian_robot, res, robo, res=[ore, clay], build=[bp.ore_robot, ore]);
+
+                            println!("M{} [O] Ore roboter: {} vs {} and {} vs {}", minute, new_time_geode, geode_time, new_time_obsidian, obsidian_time);
+                            if new_time_geode <= geode_time && new_time_obsidian <= obsidian_time  {
+                                build_ore_roboter(&bp.ore_robot, &mut res, &mut queue);
+                            }
+                        } else {
+                            // Try to build an clay roboter
+                            let (_, _, new_time_geode) = calc_remaining_time!(bp.geode_robot, res, robo, res=[ore, obsidian], build=[bp.clay_robot, clay]);
+                            let (_, _, new_time_obsidian) = calc_remaining_time!(bp.obsidian_robot, res, robo, res=[ore, clay], build=[bp.clay_robot, clay]);
+
+                            println!("M{} [O] Clay roboter: {} vs {} and {} vs {}", minute, new_time_geode, geode_time, new_time_obsidian, obsidian_time);
+                            if new_time_geode <= geode_time && new_time_obsidian <= obsidian_time {
+                                if !build_clay_roboter(&bp.clay_robot, &mut res, &mut queue) {
+                                    // Can't build an clay roboter
+                                    let (_, _, clay_time): (f32, f32, u8) = calc_remaining_time!(bp.clay_robot, res, robo, res=[ore, ore]);
+
+                                    // Try to build an ore roboter
+                                    let (_, _, new_time_geode) = calc_remaining_time!(bp.geode_robot, res, robo, res=[ore, obsidian], build=[bp.ore_robot, ore]);
+                                    let (_, _, new_time_obsidian) = calc_remaining_time!(bp.obsidian_robot, res, robo, res=[ore, clay], build=[bp.ore_robot, ore]);
+                                    let (_, _, new_time_clay) = calc_remaining_time!(bp.clay_robot, res, robo, res=[ore, ore], build=[bp.ore_robot, ore]);
+        
+                                    println!("M{} [C] Ore roboter: {} vs {} and {} vs {} and {} vs {}", minute, new_time_geode, geode_time, new_time_obsidian, obsidian_time, new_time_clay, clay_time);
+                                    if new_time_geode <= geode_time && new_time_obsidian <= obsidian_time && new_time_clay <= clay_time {
+                                        build_ore_roboter(&bp.ore_robot, &mut res, &mut queue);
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -156,10 +196,9 @@ fn play_game(bp: &Blueprint, minutes: u8) -> u8 {
         // Robots generate resources
         res += robo;
 
-        println!("M{}", minute);
-        println!("Resor: {:?}", res);
-        println!("Robos: {:?}", robo);
-        println!("Queue: {:?}", queue);
+        println!("M{} Resor: {:?}", minute, res);
+        println!("M{} Robos: {:?}", minute, robo);
+        println!("M{} Queue: {:?}", minute, queue);
 
         // New robot is ready; Add it
         robo += queue;
