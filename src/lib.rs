@@ -2,6 +2,7 @@ use std::borrow::Borrow;
 use std::cell::{RefCell, Ref, RefMut};
 use std::fs::File;
 use std::io::{self, BufRead};
+use std::ops::{Mul, Sub, Add, Div};
 use std::path::Path;
 use std::rc::Rc;
 
@@ -128,6 +129,58 @@ CF: Fn(usize,usize) -> Option<C> {
         let adjs = adjacents(node);
         for adj in adjs.iter() {
             
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Operation {
+    Add(),
+    Mul(),
+    Sub(),
+    Div()
+}
+
+impl Operation {
+    pub fn apply<T>(&self, lhs: &T, rhs: &T) -> T where T: Copy + Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T>{
+        match self {
+            Operation::Add() => *lhs + *rhs,
+            Operation::Mul() => *lhs * *rhs,
+            Operation::Sub() => *lhs - *rhs,
+            Operation::Div() => *lhs / *rhs,
+        }
+    }
+
+    pub fn inverse(&self) -> Operation {
+        match self {
+            Operation::Add() => Operation::Sub(),
+            Operation::Mul() => Operation::Div(),
+            Operation::Sub() => Operation::Add(),
+            Operation::Div() => Operation::Mul(),
+        }
+    }
+
+    pub fn isCommutative(&self) -> bool {
+        match self {
+            Operation::Add() => true,
+            Operation::Mul() => true,
+            Operation::Sub() => false,
+            Operation::Div() => false,
+        }
+    }
+}
+
+impl TryFrom<&str> for Operation {
+    type Error = String;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        match s.chars().next() {
+            Some('+') => Ok(Operation::Add()),
+            Some('*') => Ok(Operation::Mul()),
+            Some('-') => Ok(Operation::Sub()),
+            Some('/') => Ok(Operation::Div()),
+            Some(err) => Err(format!("Unknown operation: '{}'", err)),
+            None => Err("Empty string!".to_owned())
         }
     }
 }
